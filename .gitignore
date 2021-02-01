@@ -2,3 +2,6 @@
 *.log
 fv/
 *.tstamp
+*.v
+*.key
+jgproject/
