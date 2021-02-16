@@ -9,3 +9,5 @@ locked_netlist.v : syn.tcl lbll.tcl
 equiv : syn_netlist.v locked_netlist.v jg.tcl
 	jg -fpv jg.tcl -acquire_proj -no_gui
 
+clean :
+	rm -rf jgproject fv *.cmd *.log *.v *.key

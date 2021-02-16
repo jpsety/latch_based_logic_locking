@@ -3,7 +3,7 @@
 set CIRCUIT s9234
 
 set_elaborate_single_run_mode off
-analyze -verilog syn_netlist.v locked_netlist.v empty.v
+analyze -verilog syn_netlist.v locked_netlist.v designs/empty.v
 elaborate -top empty
 connect -bind $CIRCUIT orig -elaborate -auto
 connect -bind ${CIRCUIT}_lbll lock -elaborate -auto

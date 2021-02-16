@@ -1,8 +1,8 @@
 
 # simple synthesis script
-set_db / .library $::env(GENUS_DIR)/../share/synth/tutorials/tech/tutorial.lib
+set_db / .library designs/example.lib
 set CIRCUIT s9234
-read_hdl $CIRCUIT.v
+read_hdl designs/$CIRCUIT.v
 elaborate $CIRCUIT
 ungroup -flatten -all -force
 
@@ -17,7 +17,7 @@ syn_generic
 syn_map
 if {$LBLL} {
 	source lbll.tcl
-	set key [lbll 10 3 3 3]	
+	set key [lbll $lbll_lib_example 64 5]	
 	update_names -map [list [list $CIRCUIT ${CIRCUIT}_lbll]] -design
 	echo $key > locked_netlist.key
 }

@@ -19,43 +19,40 @@ proc con_check {} {
 	}
 }
 
-proc lbll_lib {} {
-	set lib [dict create]
+set lbll_lib_example [dict create]
 
-	dict set lib lat_type latchdrs
-	dict set lib lat_d D
-	dict set lib lat_q Q
-	dict set lib lat_clk ENA
-	dict set lib lat_r R
-	dict set lib lat_s S
+dict set lbll_lib_example lat_type latchdr
+dict set lbll_lib_example lat_d D
+dict set lbll_lib_example lat_q Q
+dict set lbll_lib_example lat_clk ENA
+dict set lbll_lib_example lat_r R
+# active reset value
+dict set lbll_lib_example lat_r_val 0
 
-	dict set lib ff_type fflopd
-	dict set lib ff_d D
-	dict set lib ff_q Q
-	dict set lib ff_qn QN
-	dict set lib ff_clk CK
+dict set lbll_lib_example ff_type fflopd
+dict set lbll_lib_example ff_d D
+dict set lbll_lib_example ff_q Q
+dict set lbll_lib_example ff_qn QN
+dict set lbll_lib_example ff_clk CK
 
-	dict set lib inv_type inv1
-	dict set lib inv_i A
-	dict set lib inv_o Y
+dict set lbll_lib_example inv_type inv1
+dict set lbll_lib_example inv_i A
+dict set lbll_lib_example inv_o Y
 
-	dict set lib xor_type xor2
-	dict set lib xor_i0 A
-	dict set lib xor_i1 B
-	dict set lib xor_o Y
+dict set lbll_lib_example xor_type xor2
+dict set lbll_lib_example xor_i0 A
+dict set lbll_lib_example xor_i1 B
+dict set lbll_lib_example xor_o Y
 
-	dict set lib nand_type nand2
-	dict set lib nand_i0 A
-	dict set lib nand_i1 B
-	dict set lib nand_o Y
+dict set lbll_lib_example nand_type nand2
+dict set lbll_lib_example nand_i0 A
+dict set lbll_lib_example nand_i1 B
+dict set lbll_lib_example nand_o Y
 
-	dict set lib nor_type nor2
-	dict set lib nor_i0 A
-	dict set lib nor_i1 B
-	dict set lib nor_o Y
-
-	return $lib
-}
+dict set lbll_lib_example nor_type nor2
+dict set lbll_lib_example nor_i0 A
+dict set lbll_lib_example nor_i1 B
+dict set lbll_lib_example nor_o Y
 
 proc select_ffs {nffs} {
 	#### select flops
@@ -219,41 +216,14 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 			lappend decoy_ep [lindex $locked_ep $epi]
 		}
 
-		# build random truth table
-		set tt {}
-		for {set tti 0} {$tti<[expr 2**$nfi]} {incr tti} {
-			lappend tt [expr rand()>0.5]
-		}
-
-		# ensure not constant
-		if {[lsearch -exact $tt 0] < 0} {
-			lset tt [expr int(rand()*[llength $tt])] 0
-		} elseif {[lsearch -exact $tt 1] < 0} {
-			lset tt [expr int(rand()*[llength $tt])] 1
-		}
-
-		# connect to mux
-		set nmuxin [expr $nfi + 2**$nfi] 
-		set mux [create_primitive -function bmux -inside $design -inputs $nmuxin]
-		set mux_name [get_db $mux .base_name]
-		for {set tti 0} {$tti<[expr 2**$nfi]} {incr tti} {
-			connect [lindex $tt $tti] $mux_name/data$tti
-		}
-		for {set spi 0} {$spi<$nfi} {incr spi} {
-			set sp [lindex $decoy_sp $spi]
-			if {[get_db $sp .obj_type] eq "pin"} {
-				set driver [get_db $sp .inst.pins -if .base_name==[dict get $lib lat_q]||.base_name==[dict get $lib ff_q]]
-			} else {
-				set driver $sp
-			}
-			connect $driver $mux_name/sel$spi
-		}
+		echo "endpoints: $decoy_ep"
+		echo "startpoints: $decoy_sp"
 
 		# add latch
 		set lat [create_inst [dict get $lib lat_type] $design]
 
-		# connect latch input
-		connect [get_db $lat .pins -if .base_name==[dict get $lib lat_d]] [get_db $mux .pins -if .base_name==z]
+		# temporary case analysis
+		set_case_analysis [dict get $lib lat_r_val] [get_db $lat .pins -if .base_name==[dict get $lib lat_r]]
 
 		# from the fanin of selected endpoints, find gates not in fanin of non-locked endpoints
 		# non-locked endpoints
@@ -286,30 +256,33 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 			# select random pin
 			lappend fo_pins [lindex $pot_fanin [expr int([llength $pot_fanin]*rand())]]
 		}
+		echo "fo pins: $fo_pins"
 
-		# connect latch output
+		# connect latch output to fo pins
 		foreach fo_pin $fo_pins {
 			set r [expr rand()]
 			# choose output gate type
 			if {$r<0.33} {
 				set g [create_primitive -function or -inside $design -inputs 2]
+				echo "spliced with or: $g"
 				connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] [get_db $g .pins -if .base_name==in_0]
 				set in_pin [get_db $g .pins -if .base_name==in_1]
 				set out_pin [get_db $g .pins -if .base_name==z]
 			} elseif {$r<0.66} {
 				set g [create_primitive -function xor -inside $design -inputs 2]
+				echo "spliced with xor: $g"
 				connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] [get_db $g .pins -if .base_name==in_0]
 				set in_pin [get_db $g .pins -if .base_name==in_1]
 				set out_pin [get_db $g .pins -if .base_name==z]
 			} else {
 				set g [create_primitive -function bmux -inside $design -inputs 3]
+				echo "spliced with mux: $g"
 				connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] [get_db $g .pins -if .base_name==sel0]
-				connect [lindex $decoy_sp end] [get_db $g .pins -if .base_name==data1]
 				set in_pin [get_db $g .pins -if .base_name==data0]
 				set out_pin [get_db $g .pins -if .base_name==z]
 			}
 
-			# splice into net
+			# splice output gate into net
 			if {[get_db $fo_pin .net.drivers] eq $fo_pin} {
 				set loads [get_db $fo_pin .net.loads]
 				if {$loads eq ""} {suspend}
@@ -323,9 +296,63 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 				connect $in_pin $driver
 				connect $out_pin $fo_pin
 			}
+
+			if {$r>=0.66} {
+				set sp [lindex $decoy_sp end]
+				if {[get_db $sp .obj_type] eq "pin"} {
+					set driver [get_db $sp .inst.pins -if .base_name==[dict get $lib lat_q]||.base_name==[dict get $lib ff_q]]
+				} else {
+					set driver $sp
+				}
+				echo "driver: $driver"
+				connect $driver [get_db $g .pins -if .base_name==data1]
+			}
+
+		}
+
+		# build random truth table
+		set tt {}
+		for {set tti 0} {$tti<[expr 2**$nfi]} {incr tti} {
+			lappend tt [expr rand()>0.5]
+		}
+
+		# ensure not constant
+		if {[lsearch -exact $tt 0] < 0} {
+			lset tt [expr int(rand()*[llength $tt])] 0
+		} elseif {[lsearch -exact $tt 1] < 0} {
+			lset tt [expr int(rand()*[llength $tt])] 1
+		}
+
+		# connect to mux
+		set nmuxin [expr $nfi + 2**$nfi] 
+		set mux [create_primitive -function bmux -inside $design -inputs $nmuxin]
+		set mux_name [get_db $mux .base_name]
+		for {set tti 0} {$tti<[expr 2**$nfi]} {incr tti} {
+			connect [lindex $tt $tti] $mux_name/data$tti
+		}
+		for {set spi 0} {$spi<$nfi} {incr spi} {
+			set sp [lindex $decoy_sp $spi]
+			if {[get_db $sp .obj_type] eq "pin"} {
+				set driver [get_db $sp .inst.pins -if .base_name==[dict get $lib lat_q]||.base_name==[dict get $lib ff_q]]
+			} else {
+				set driver $sp
+			}
+			echo "sp: $sp, driver: $driver"
+			connect $driver $mux_name/sel$spi
+		}
+
+		# connect latch input
+		connect [get_db $lat .pins -if .base_name==[dict get $lib lat_d]] [get_db $mux .pins -if .base_name==z]
+
+		# check for loops TODO: check for loops without timing
+		report_timing
+		report_loop
+		if {[llength [get_db insts -if .base_name==*loop*]]>0} {
+			suspend
 		}
 
 		lappend decoys [list $lat "logic"]
+
 	}
 
 	return $decoys
@@ -368,6 +395,9 @@ proc insert_delay_decoys {lib ndelay} {
 		# add latch
 		set lat [create_inst [dict get $lib lat_type] $design]
 
+		# temporary case analysis
+		set_case_analysis 1 [get_db $lat .pins -if .base_name==[dict get $lib lat_clk]]
+
 		# connect latch
 		if {[get_db $decoy_pin .net.drivers] eq $decoy_pin} {
 			set loads [get_db $decoy_pin .net.loads]
@@ -396,18 +426,23 @@ proc connect_latch_clk_rst {lib lat_types} {
 		set lat [lindex $lat_type 0]
 		set type [lindex $lat_type 1]
 
+		# reset temporary case analysis
+		remove_case_analysis [get_db $lat .pins -if .base_name==[dict get $lib lat_r]]
+		remove_case_analysis [get_db $lat .pins -if .base_name==[dict get $lib lat_clk]]
+
 		# create instances
 		set xor [create_inst [dict get $lib xor_type] -name "lbll_xor_$i" $design]
 		set nand [create_inst [dict get $lib nand_type] -name "lbll_nand_$i" $design]
 		set nor [create_inst [dict get $lib nor_type] -name "lbll_nor_$i" $design]
-		set inv [create_inst [dict get $lib inv_type] -name "lbll_inv_$i" $design]
+		if {[dict get $lib lat_r_val]==0} {
+			set inv [create_inst [dict get $lib inv_type] -name "lbll_inv_$i" $design]
+		}
 
 		# create key ports
 		set key0 [get_db [create_port_bus -input -name lbll_key_$i] .bits]
 		set key1 [get_db [create_port_bus -input -name lbll_key_[expr $i+1]] .bits]
 
 		# connect latch
-		connect [get_db $lat .pins -if .base_name==[dict get $lib lat_s]] 1
 		connect [get_db $xor .pins -if .base_name==[dict get $lib xor_i0]] [get_db clocks .sources]
 		connect [get_db $xor .pins -if .base_name==[dict get $lib xor_i1]] $key1
 		connect [get_db $xor .pins -if .base_name==[dict get $lib xor_o]] [get_db $nand .pins -if .base_name==[dict get $lib nand_i0]]
@@ -415,8 +450,12 @@ proc connect_latch_clk_rst {lib lat_types} {
 		connect [get_db $nand .pins -if .base_name==[dict get $lib nand_i1]] $key0
 		connect [get_db $nor .pins -if .base_name==[dict get $lib nor_i0]] $key0
 		connect [get_db $nor .pins -if .base_name==[dict get $lib nor_i1]] $key1
-		connect [get_db $nor .pins -if .base_name==[dict get $lib nor_o]] [get_db $inv .pins -if .base_name==[dict get $lib inv_i]]
-		connect [get_db $lat .pins -if .base_name==[dict get $lib lat_r]] [get_db $inv .pins -if .base_name==[dict get $lib inv_o]]
+		if {[dict get $lib lat_r_val]==0} {
+			connect [get_db $nor .pins -if .base_name==[dict get $lib nor_o]] [get_db $inv .pins -if .base_name==[dict get $lib inv_i]]
+			connect [get_db $lat .pins -if .base_name==[dict get $lib lat_r]] [get_db $inv .pins -if .base_name==[dict get $lib inv_o]]
+		} else {
+			connect [get_db $nor .pins -if .base_name==[dict get $lib nor_o]] [get_db $lat .pins -if .base_name==[dict get $lib lat_r]]
+		}
 
 		# set the appropriate key bit based on latch order
 		if {$type eq "L0"} {
@@ -447,27 +486,47 @@ proc connect_latch_clk_rst {lib lat_types} {
 }
 
 ##################### lbll #####################
-proc lbll {{nffs 10} {nlogic 3} {ndelay 3} {max_fio 3}} {
-
-	# set up lib names
-	set lib [lbll_lib]
+proc lbll {{lib $lbll_example_lib} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3}} {
+	# lib: a dict containing library information, example above in lbll_example_lib
+	# nbits: total number of locking bits to insert
+	# nffs: number of flip-flops to convert to latches,
+	#		creates an undetermined number of key bits,
+	#		remaining key bits are decoys
+	# plogic: % of decoys that are logic. Thus pdelay = 1-pdecoys.
+	# max_fio: maximum fanout/in for the added decoy logic
 
 	# select flops
 	set selected_ffs [select_ffs $nffs]
 
 	# convert flops to latches and retime
 	set orig_lats [latch_convert_retime $lib $selected_ffs]
+
+	# determine decoy counts
+	set ndecoy [expr $nbits/2-[llength $orig_lats]]
+	if {$ndecoy < 0} {
+		echo "original latch count exceeds nbits! 
+			 Reduce nff or increase nbits to allow decoys"
+		set ndecoy 0
+	}
+	echo "inserting $ndecoy decoys..."
+	set nlogic [expr int(ceil($ndecoy*$plogic))]
+	set ndelay [expr int($ndecoy-$nlogic)]
 	
-	# insert decoys
+	# insert logic decoys
+	echo "inserting $nlogic logic decoys..."
 	set logic_decoys [insert_logic_decoys $lib $nlogic $max_fio]
+
+	# insert delay decoys
+	echo "inserting $ndelay delay decoys..."
 	set delay_decoys [insert_delay_decoys $lib $ndelay]
 
 	# connect latch clock/reset
+	echo "adding key logic..."
 	set key [connect_latch_clk_rst $lib [concat $orig_lats $logic_decoys $delay_decoys]]
-
-	# run map for new decoy logic
 	con_check
-	syn_map
+	if {$nlogic>0} {
+		syn_map
+	}
 
 	# check connections
 	con_check
