@@ -87,41 +87,39 @@ proc select_ffs {nffs} {
 
 proc latch_convert_retime {lib selected_ffs} {
 
-	# duplicate ffs
+	# TODO: make this safe
 	set design [get_db designs .base_name]
+
+	# duplicate ffs
 	echo "duplicating ffs..."
-	foreach ff $selected_ffs {
+	foreach ff_0 $selected_ffs {
 
-		#names
-		set ff_name_0 "[get_db $ff .name]_F0"
-		set ff_name_1 "[get_db $ff .name]_F1"
+		# duplicate flop for each output pin
+		foreach out_pin_type {ff_q ff_qn} {
+			if {[llength [get_db $ff_0 .pins -if .base_name==[dict get $lib $out_pin_type]&&.net!=""]]==0} {
+				continue
+			}
 
-		# handle multi-output ff, adding an inv and disconnecting
-		if {[llength [get_db $ff .pins -if .base_name==[dict get $lib ff_qn]&&.net!=""]]>0} {
-			set inv [create_inst [dict get $lib inv_type] $design]
-			set qn_ff [get_db $ff .pins -if .base_name==[dict get $lib ff_qn]]
-			set q_ff [get_db $ff .pins -if .base_name==[dict get $lib ff_q]]
-			connect $qn_ff [get_db $inv .pins -if .base_name==[dict get $lib inv_o]]
-			connect $q_ff [get_db $inv .pins -if .base_name==[dict get $lib inv_i]]
-			disconnect $qn_ff
+			#create ff
+			set ff_name_1 "[get_db $ff_0 .name]_[dict get $lib $out_pin_type]_F1"
+			set ff_1 [create_inst [dict get $lib ff_type] -name $ff_name_1 $design]
+
+			#connect ff
+			set clk_ff_0 [get_db $ff_0 .pins -if .base_name==[dict get $lib ff_clk]]
+			set clk_ff_1 [get_db $ff_1 .pins -if .base_name==[dict get $lib ff_clk]]
+			set out_ff_0 [get_db $ff_0 .pins -if .base_name==[dict get $lib $out_pin_type]]
+			set q_ff_1 [get_db $ff_1 .pins -if .base_name==[dict get $lib ff_q]]
+			set d_ff_1 [get_db $ff_1 .pins -if .base_name==[dict get $lib ff_d]]
+			set net [get_db $out_ff_0 .net]
+			set net_load [lindex [get_db $net .loads] 0]
+			disconnect $out_ff_0
+			connect $out_ff_0 $d_ff_1 
+			connect $q_ff_1 $net_load
+			connect $clk_ff_1 $clk_ff_0
 		}
 
-		#create second ff
-		set ff_0 $ff
-		set ff_1 [create_inst [dict get $lib ff_type] -name $ff_name_1 $design]
-
-		#connect second ff
-		set clk_ff_0 [get_db $ff_0 .pins -if .base_name==[dict get $lib ff_clk]]
-		set clk_ff_1 [get_db $ff_1 .pins -if .base_name==[dict get $lib ff_clk]]
-		set q_ff_0 [get_db $ff_0 .pins -if .base_name==[dict get $lib ff_q]]
-		set q_ff_1 [get_db $ff_1 .pins -if .base_name==[dict get $lib ff_q]]
-		set d_ff_1 [get_db $ff_1 .pins -if .base_name==[dict get $lib ff_d]]
-		set net [get_db $q_ff_0 .net]
-		set net_load [lindex [get_db $net .loads] 0]
-		disconnect $q_ff_0
-		connect $q_ff_0 $d_ff_1 
-		connect $q_ff_1 $net_load
-		connect $clk_ff_1 $clk_ff_0
+		# change orig ff name
+		set ff_name_0 "[get_db $ff_0 .name]_F0"
 		rename_obj $ff_0 $ff_name_0
 	}
 
@@ -164,9 +162,20 @@ proc latch_convert_retime {lib selected_ffs} {
 			lappend lats [list $lat "L1"]
 		}
 
-		# connect latch d/q
-		connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] [get_db $ff .pins -if .base_name==[dict get $lib ff_q]]
+		# connect latch q/qn
+		if {[llength [get_db $ff .pins -if .base_name==[dict get $lib ff_q]&&.net!=""]]!=0} {
+			connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] [get_db $ff .pins -if .base_name==[dict get $lib ff_q]]
+		}
+		if {[llength [get_db $ff .pins -if .base_name==[dict get $lib ff_qn]&&.net!=""]]!=0} {
+			set inv [create_inst [dict get $lib inv_type] $design]
+			connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] [get_db $inv .pins -if .base_name==[dict get $lib inv_i]]
+			connect [get_db $ff .pins -if .base_name==[dict get $lib ff_qn]] [get_db $inv .pins -if .base_name==[dict get $lib inv_o]]
+		}
+
+		# connect latch d
 		connect [get_db $lat .pins -if .base_name==[dict get $lib lat_d]] [get_db $ff .pins -if .base_name==[dict get $lib ff_d]]
+
+		# remove ff
 		delete_obj $ff
 	}
 
