@@ -1,6 +1,7 @@
 
 
-set CIRCUIT s9234
+set CIRCUIT gps
+set clk sys_clk_50
 
 set_elaborate_single_run_mode off
 analyze -verilog syn_netlist.v locked_netlist.v designs/empty.v
@@ -50,8 +51,8 @@ dict for {k v} $key {
 }
 
 assume [join $tie_eq "&&"]
-assume lock.clk==1'b1
-assume orig.clk==1'b1
+assume lock.$clk==1'b1
+assume orig.$clk==1'b1
 assert [join $comp_eq "&&"]
 
 # prove

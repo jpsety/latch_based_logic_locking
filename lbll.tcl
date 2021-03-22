@@ -85,7 +85,7 @@ proc select_ffs {nffs} {
 	return $selected_ffs
 }
 
-proc latch_convert_retime {lib selected_ffs} {
+proc latch_convert_retime {lib clk selected_ffs} {
 
 	# TODO: make this safe
 	set design [get_db designs .base_name]
@@ -127,7 +127,7 @@ proc latch_convert_retime {lib selected_ffs} {
 	echo "retiming ffs..."
 	set period [expr [get_db clocks .period]/1000]
 	set retime_period [expr $period/2]
-	create_clock -period $retime_period clk
+	create_clock -period $retime_period $clk
 
 	set_db [get_db design:$design] .retime true
 	::legacy::set_attribute retime_reg_naming_suffix _retimed_reg_F1 /
@@ -135,7 +135,7 @@ proc latch_convert_retime {lib selected_ffs} {
 	set_db [get_db insts *_F1] .dont_retime false 
 
 	retime -min_delay
-	create_clock -period $period clk
+	create_clock -period $period $clk
 
 	# delete state points
 	set_db [get_db hinsts *state_point] .preserve false
@@ -292,20 +292,35 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 			}
 
 			# splice output gate into net
-			if {[get_db $fo_pin .net.drivers] eq $fo_pin} {
+			if {[lindex [get_db $fo_pin .net.drivers] 0] eq $fo_pin} {
+				# pin is driver
 				set loads [get_db $fo_pin .net.loads]
 				if {$loads eq ""} {suspend}
 				disconnect $fo_pin
 				connect $in_pin $fo_pin
 				connect $out_pin [lindex $loads 0]
+
+				echo "driver"
+				echo "in_pin: $in_pin"
+				echo "out_pin: $out_pin"
+				echo "loads: $loads"
+				echo "fo_pin: $fo_pin"
 			} else {
+				# pin is load
 				set driver [get_db $fo_pin .net.drivers]
 				if {$driver eq ""} {suspend}
 				disconnect $fo_pin
 				connect $in_pin $driver
 				connect $out_pin $fo_pin
+
+				echo "load"
+				echo "in_pin: $in_pin"
+				echo "out_pin: $out_pin"
+				echo "driver: $driver"
+				echo "fo_pin: $fo_pin"
 			}
 
+			# hook up mux data
 			if {$r>=0.66} {
 				set sp [lindex $decoy_sp end]
 				if {[get_db $sp .obj_type] eq "pin"} {
@@ -495,7 +510,7 @@ proc connect_latch_clk_rst {lib lat_types} {
 }
 
 ##################### lbll #####################
-proc lbll {{lib $lbll_example_lib} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3}} {
+proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3}} {
 	# lib: a dict containing library information, example above in lbll_example_lib
 	# nbits: total number of locking bits to insert
 	# nffs: number of flip-flops to convert to latches,
@@ -508,7 +523,7 @@ proc lbll {{lib $lbll_example_lib} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3
 	set selected_ffs [select_ffs $nffs]
 
 	# convert flops to latches and retime
-	set orig_lats [latch_convert_retime $lib $selected_ffs]
+	set orig_lats [latch_convert_retime $lib $clk $selected_ffs]
 
 	# determine decoy counts
 	set ndecoy [expr $nbits/2-[llength $orig_lats]]
