@@ -44,7 +44,7 @@ if {$LBLL==0} {
 	syn_map
 
 	# lock
-	source lbll.tcl
+	source src/lbll.tcl
 	set key [lbll $lbll_lib_example clk $nbits $nffs]	
 
 	# opt

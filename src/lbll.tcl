@@ -125,7 +125,7 @@ proc latch_convert_retime {lib clk selected_ffs} {
 
 	# retime F1 ffs
 	echo "retiming ffs..."
-	set period [expr [get_db clocks .period]/1000]
+	set period [expr [get_db clocks .actual_period]/1000]
 	set retime_period [expr $period/2]
 	create_clock -period $retime_period $clk
 
@@ -445,6 +445,7 @@ proc insert_delay_decoys {lib ndelay} {
 
 proc connect_latch_clk_rst {lib lat_types} {
 	set design [get_db designs .base_name]
+	set key_bus [get_db [create_port_bus -input -left_bit [expr [llength $lat_types]*2] -right_bit 0 -name lbll_key] .bits]
 	set key [dict create]
 	set i 0
 	foreach lat_type $lat_types {
@@ -464,8 +465,8 @@ proc connect_latch_clk_rst {lib lat_types} {
 		}
 
 		# create key ports
-		set key0 [get_db [create_port_bus -input -name lbll_key_$i] .bits]
-		set key1 [get_db [create_port_bus -input -name lbll_key_[expr $i+1]] .bits]
+		set key0 [lindex $key_bus $i]
+		set key1 [lindex $key_bus [expr $i+1]]
 
 		# connect latch
 		connect [get_db $xor .pins -if .base_name==[dict get $lib xor_i0]] [get_db clocks .sources]
@@ -513,12 +514,14 @@ proc connect_latch_clk_rst {lib lat_types} {
 ##################### lbll #####################
 proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3} {seed 0}} {
 	# lib: a dict containing library information, example above in lbll_example_lib
+	# clk: clock input to select flops from
 	# nbits: total number of locking bits to insert
 	# nffs: number of flip-flops to convert to latches,
 	#		creates an undetermined number of key bits,
 	#		remaining key bits are decoys
 	# plogic: % of decoys that are logic. Thus pdelay = 1-pdecoys.
 	# max_fio: maximum fanout/in for the added decoy logic
+	# seed: seed for random insertion
 	
 	# set seed
 	expr srand($seed)

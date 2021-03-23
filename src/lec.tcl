@@ -53,7 +53,7 @@ assume orig.$clk==1'b1
 assert [join $comp_eq "&&"]
 
 # prove
-set fp [open locked/$CIRCUIT.equiv w]
+set fp [open locked/$CIRCUIT.lec w]
 if {[prove -all] ne "proven"} {
 	puts $fp "error"
 } else {
