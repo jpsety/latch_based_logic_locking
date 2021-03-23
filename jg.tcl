@@ -1,10 +1,7 @@
 
-
-set CIRCUIT gps
-set clk sys_clk_50
-
+set clk clk
 set_elaborate_single_run_mode off
-analyze -verilog syn_netlist.v locked_netlist.v designs/empty.v
+analyze -verilog syn/$CIRCUIT.v locked/$CIRCUIT.v designs/empty.v
 elaborate -top empty
 connect -bind $CIRCUIT orig -elaborate -auto
 connect -bind ${CIRCUIT}_lbll lock -elaborate -auto
@@ -44,7 +41,7 @@ foreach output [get_design_info -instance orig -list output] {
 }
 
 # assume keys
-set f [open locked_netlist.key r]
+set f [open locked/$CIRCUIT.key r]
 set key [gets $f]
 dict for {k v} $key {
 	lappend tie_eq "(lock.$k==1'b$v)"
@@ -56,9 +53,12 @@ assume orig.$clk==1'b1
 assert [join $comp_eq "&&"]
 
 # prove
+set fp [open locked/$CIRCUIT.equiv w]
 if {[prove -all] ne "proven"} {
-	puts "error"
-} else {exit}
-
+	puts $fp "error"
+} else {
+	puts $fp "equiv"
+}
+exit
 
 

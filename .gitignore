@@ -5,3 +5,5 @@ fv/
 *.v
 *.key
 jgproject/
+locked/
+syn/

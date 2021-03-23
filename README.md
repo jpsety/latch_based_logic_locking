@@ -1,5 +1,5 @@
 # latch_based_logic_locking
-This repo contains a Genus implementation of a version of latch-based logic locking along with an example circuit.
+This repo contains a Genus implementation of a version of latch-based logic locking along with a set of example circuits.
 
 ```make equiv``` will synthesize the original circuit and its locked counter-part, then will run an equivalence check
 to verify the functionality is maintained. 

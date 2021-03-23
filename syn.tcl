@@ -1,34 +1,60 @@
-
 # simple synthesis script
+# Joe Sweeney, CMU
+
+# circuit/lib
 set_db / .library designs/example.lib
-set CIRCUIT gps
-set CLK sys_clk_50
-read_hdl "designs/cacode.v designs/gps.v designs/pcode.v designs/aes_192.v designs/table.v designs/round.v"
+read_hdl [glob "designs/$CIRCUIT/*.v"]
 elaborate $CIRCUIT
 ungroup -flatten -all -force
 
-# constrain 
-set period 2.5
-create_clock -period $period $CLK
-set_input_delay 0 -clock $CLK [all_inputs -no_clocks]
-set_output_delay 0 -clock $CLK [all_outputs]
+# synthesis at max freq
+if {$LBLL==0} {
 
-# synthesis
-syn_generic
-syn_map
-if {$LBLL} {
-	source lbll.tcl
-	set key [lbll $lbll_lib_example $CLK 64 5]	
-	update_names -map [list [list $CIRCUIT ${CIRCUIT}_lbll]] -design
-	echo $key > locked_netlist.key
-}
+	# constrain 
+	set init_period 0.001
+	create_clock -period $init_period clk
+	set_input_delay 0 -clock clk [all_inputs -no_clocks]
+	set_output_delay 0 -clock clk [all_outputs]
 
-syn_opt
+	# synthesis
+	syn_generic
+	syn_map
+	syn_opt
 
-if {$LBLL} {
-	write_hdl -generic ${CIRCUIT}_lbll > locked_netlist.v
+	# opt at max freq
+	set period [expr $init_period - ([get_db [get_db designs $CIRCUIT] .slack]/1000)]
+	create_clock -period $period clk
+	syn_opt
+
+	# output
+	echo $period > syn/$CIRCUIT.period
+	write_hdl -generic $CIRCUIT > syn/$CIRCUIT.v
+
+
+# lock design, use prev found freq
 } else {
-	write_hdl -generic $CIRCUIT > syn_netlist.v
+	# constrain 
+	set period [gets [open syn/$CIRCUIT.period r]]
+	create_clock -period $period clk
+	set_input_delay 0 -clock clk [all_inputs -no_clocks]
+	set_output_delay 0 -clock clk [all_outputs]
+
+	# syn through mapping
+	syn_generic
+	syn_map
+
+	# lock
+	source lbll.tcl
+	set key [lbll $lbll_lib_example clk $nbits $nffs]	
+
+	# opt
+	syn_opt
+
+	# output
+	update_names -map [list [list $CIRCUIT ${CIRCUIT}_lbll]] -design
+	echo $key > locked/$CIRCUIT.key
+	write_hdl -generic ${CIRCUIT}_lbll > locked/$CIRCUIT.v
+
 }
 
 report_timing

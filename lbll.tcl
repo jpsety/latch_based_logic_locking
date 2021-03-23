@@ -233,6 +233,7 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 
 		# temporary case analysis
 		set_case_analysis [dict get $lib lat_r_val] [get_db $lat .pins -if .base_name==[dict get $lib lat_r]]
+		set_case_analysis 0 [get_db $lat .pins -if .base_name==[dict get $lib lat_q]]
 
 		# from the fanin of selected endpoints, find gates not in fanin of non-locked endpoints
 		# non-locked endpoints
@@ -510,7 +511,7 @@ proc connect_latch_clk_rst {lib lat_types} {
 }
 
 ##################### lbll #####################
-proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3}} {
+proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5} {max_fio 3} {seed 0}} {
 	# lib: a dict containing library information, example above in lbll_example_lib
 	# nbits: total number of locking bits to insert
 	# nffs: number of flip-flops to convert to latches,
@@ -518,6 +519,9 @@ proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5
 	#		remaining key bits are decoys
 	# plogic: % of decoys that are logic. Thus pdelay = 1-pdecoys.
 	# max_fio: maximum fanout/in for the added decoy logic
+	
+	# set seed
+	expr srand($seed)
 
 	# select flops
 	set selected_ffs [select_ffs $nffs]
