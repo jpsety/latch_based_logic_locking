@@ -24,5 +24,9 @@ locked/%.sec : syn/%.v locked/%.v src/sec.tcl
 	jg -sec src/sec.tcl -acquire_proj -no_gui -define CIRCUIT $* \
 		-proj locked/$*_sec
 
+# gps sim
+sim_gps :
+	xrun -top tb generic_gps/tb.sv generic_gps/gps.v generic_gps/gps_lbll.v -ALLOWREDEFINITION -debug -gui
+
 clean :
-	rm -rf jgproject fv *.cmd *.log *.v *.key locked syn
+	rm -rf jgproject fv *.cmd *.log *.v *.key INCA_libs irun.key waves.shm irun.log

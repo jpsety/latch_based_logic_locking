@@ -7,3 +7,7 @@ fv/
 jgproject/
 locked/
 syn/
+.simvision/
+waves.shm/
+xcelium.d/
+xrun.history

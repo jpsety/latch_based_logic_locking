@@ -9,7 +9,7 @@
 //
 //************************************************************************
 module gps(
-           sys_clk_50,
+           clk,
            sync_rst_in,
            sv_num,
            startRound,
@@ -18,7 +18,7 @@ module gps(
            l_code,
            l_code_valid
        );
-input  sys_clk_50;
+input  clk;
 input  sync_rst_in;
 input [5:0] sv_num;
 input startRound;
@@ -185,15 +185,15 @@ always @(posedge gps_clk_fast)
 //`define USE_SLOW_CLOCK
 `ifdef USE_SLOW_CLOCK
   gps_clkgen gps_clkgen_inst(
-    .sys_clk_50(sys_clk_50),
+    .sys_clk_50(clk),
     .sync_rst_in(sync_rst_in),
 
     .gps_clk_fast(gps_clk_fast),
     .gps_clk_slow(gps_clk_slow),
     .gps_rst());
 `else
-   assign gps_clk_fast = sys_clk_50;
-   assign gps_clk_slow = sys_clk_50;
+   assign gps_clk_fast = clk;
+   assign gps_clk_slow = clk;
 `endif
 
    //
