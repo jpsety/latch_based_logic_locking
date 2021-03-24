@@ -4,6 +4,10 @@ This repo contains a Genus implementation of a version of latch-based logic lock
 ## Running Examples
 
 ```make locked/<circuit>.sec``` will synthesize the original circuit and its locked counter-part, then will run a sequential equivalence check to verify the functionality is maintained. The example names correspond to the name of the directories under ```designs```. See the ```makefile``` for more explicit usage. For example ```make locked/s27.lec``` will run the locking and then use a logic equivalence check for verification. 
+In this flow, the ```nffs``` (# of flip-flops from the original circuit to convert) and `nbits` (total key bits) parameters can be easily set via ```make```:
+```
+make locked/gps.v nbits=256 nffs=10
+```
 
 ## Code Overview
 
