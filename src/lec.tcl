@@ -2,7 +2,7 @@
 set clk clk
 set_elaborate_single_run_mode off
 analyze -verilog syn/$CIRCUIT.v locked/$CIRCUIT.v designs/empty.v
-elaborate -top empty
+elaborate -top empty -bbox 1
 connect -bind $CIRCUIT orig -elaborate -auto
 connect -bind ${CIRCUIT}_lbll lock -elaborate -auto
 

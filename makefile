@@ -1,8 +1,8 @@
 .SECONDARY:
 .PRECIOUS:
 
-nbits=64
-nffs=5
+nbits=256
+nffs=15
 
 # synthesis at max freq
 syn/%.v : src/syn.tcl 
@@ -16,17 +16,20 @@ locked/%.v : src/syn.tcl src/lbll.tcl syn/%.v
 
 # logic equivalence between locked and syn
 locked/%.lec : syn/%.v locked/%.v src/lec.tcl
-	jg -fpv src/lec.tcl -acquire_proj -no_gui -define CIRCUIT $* \
+	jg -sec src/lec.tcl -acquire_proj -define CIRCUIT $* \
 		-proj locked/$*_lec
+	#-no_gui
 
 # sequential equivalence between locked and syn
 locked/%.sec : syn/%.v locked/%.v src/sec.tcl
-	jg -sec src/sec.tcl -acquire_proj -no_gui -define CIRCUIT $* \
-		-proj locked/$*_sec
+	jg -sec src/sec.tcl -acquire_proj -define CIRCUIT $* \
+		-proj locked/$*_sec -no_gui
 
-# gps sim
-sim_gps :
-	xrun -top tb generic_gps/tb.sv generic_gps/gps.v generic_gps/gps_lbll.v -ALLOWREDEFINITION -debug -gui
+# simulation equivalence between locked and syn
+locked/%.sim : syn/%.v locked/%.v
+	xrun -top tb syn/$*.v locked/$*.v designs/$*/tb/* \
+		-ALLOWREDEFINITION -debug -gui -define NBITS=$(nbits)
 
 clean :
-	rm -rf jgproject fv *.cmd *.log *.v *.key INCA_libs irun.key waves.shm irun.log
+	rm -rf jgproject fv *.cmd *.log *.v *.key INCA_libs irun.key \
+		waves.shm irun.log xcelium.d xrun.history *.diag

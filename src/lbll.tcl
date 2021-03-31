@@ -8,15 +8,22 @@ proc lintersection {la lb} {
 	return $len
 }
 
-proc con_check {} {
+proc con_check {{ignore_r_c 0} {lib {}}} {
 	foreach p [get_db pins] {
 		if {[get_db $p .constant] eq "no_constant"} {
-			if {[get_db $p .net] eq ""} {
+			if {([get_db $p .net] eq "")||([get_db $p .net.num_loads]==0)||([get_db $p .net.num_drivers]==0)} {
+				if {$ignore_r_c} {
+					if {[get_db $p .base_name] eq [dict get $lib lat_r]} {continue}
+					if {[get_db $p .base_name] eq [dict get $lib lat_clk]} {continue}
+					if {[get_db $p .base_name] eq [dict get $lib ff_clk]} {continue}
+				} 
 				echo "unconnected pin $p"
-				suspend
+				return 1
+				
 			}
 		}
 	}
+	return 0
 }
 
 set lbll_lib_example [dict create]
@@ -92,6 +99,10 @@ proc latch_convert_retime {lib clk selected_ffs} {
 
 	# duplicate ffs
 	echo "duplicating ffs..."
+	if {[con_check 1 $lib]} {
+		echo "disconnect before duplicated flops"	
+		suspend
+	}
 	foreach ff_0 $selected_ffs {
 
 		# duplicate flop for each output pin
@@ -121,6 +132,10 @@ proc latch_convert_retime {lib clk selected_ffs} {
 		# change orig ff name
 		set ff_name_0 "[get_db $ff_0 .name]_F0"
 		rename_obj $ff_0 $ff_name_0
+		if {[con_check 1 $lib]} {
+			echo "disconnect during duplicated flops"	
+			suspend
+		}
 	}
 
 	# retime F1 ffs
@@ -145,6 +160,10 @@ proc latch_convert_retime {lib clk selected_ffs} {
 		delete_obj $sp
 		connect $dr $ld
 	}
+	if {[con_check 1 $lib]} {
+		echo "disconnect after delete state points"	
+		suspend
+	}
 
 	## switch to latches
 	set key [dict create]
@@ -158,7 +177,8 @@ proc latch_convert_retime {lib clk selected_ffs} {
 			set lat [create_inst [dict get $lib lat_type] -name $lat_name $design]
 			lappend lats [list $lat "L0"]
 		} else {
-			set lat [create_inst [dict get $lib lat_type] $design]
+			set lat_name [string map {"_F1" "_L1"} [get_db $ff .base_name]] 
+			set lat [create_inst [dict get $lib lat_type] -name $lat_name $design]
 			lappend lats [list $lat "L1"]
 		}
 
@@ -177,6 +197,11 @@ proc latch_convert_retime {lib clk selected_ffs} {
 
 		# remove ff
 		delete_obj $ff
+
+		if {[con_check 1 $lib]} {
+			echo "disconnect durring latch conversion"	
+			suspend
+		}
 	}
 
 	return $lats
@@ -229,7 +254,7 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 		echo "startpoints: $decoy_sp"
 
 		# add latch
-		set lat [create_inst [dict get $lib lat_type] $design]
+		set lat [create_inst [dict get $lib lat_type] -name logic_decoy_$di $design]
 
 		# temporary case analysis
 		set_case_analysis [dict get $lib lat_r_val] [get_db $lat .pins -if .base_name==[dict get $lib lat_r]]
@@ -410,6 +435,9 @@ proc insert_delay_decoys {lib ndelay} {
 		}
 	}
 
+	# filter out hpins etc
+	set potential_pins [get_db $potential_pins -if .obj_type==pin]
+
 	# select random pins
 	set decoys {}
 	for {set di 0} {$di<$ndelay} {incr di} {
@@ -418,13 +446,13 @@ proc insert_delay_decoys {lib ndelay} {
 		set potential_pins [lremove $potential_pins $pin_i]
 
 		# add latch
-		set lat [create_inst [dict get $lib lat_type] $design]
+		set lat [create_inst [dict get $lib lat_type] -name delay_decoy_$di $design]
 
 		# temporary case analysis
 		set_case_analysis 1 [get_db $lat .pins -if .base_name==[dict get $lib lat_clk]]
 
 		# connect latch
-		if {[get_db $decoy_pin .net.drivers] eq $decoy_pin} {
+		if {[lindex [get_db $decoy_pin .net.drivers] 0] eq $decoy_pin} {
 			set loads [get_db $decoy_pin .net.loads]
 			if {$loads eq ""} {suspend}
 			disconnect $decoy_pin
@@ -438,6 +466,8 @@ proc insert_delay_decoys {lib ndelay} {
 			connect [get_db $lat .pins -if .base_name==[dict get $lib lat_q]] $decoy_pin
 		}
 		lappend decoys [list $lat "delay"]
+		if {[con_check 1 $lib]} {suspend}
+
 	}
 
 	return $decoys
@@ -445,8 +475,9 @@ proc insert_delay_decoys {lib ndelay} {
 
 proc connect_latch_clk_rst {lib lat_types} {
 	set design [get_db designs .base_name]
-	set key_bus [get_db [create_port_bus -input -left_bit [expr [llength $lat_types]*2] -right_bit 0 -name lbll_key] .bits]
-	set key [dict create]
+	set nbits [expr [llength $lat_types]*2]
+	set key_bus [lreverse [get_db [create_port_bus -input -left_bit [expr $nbits-1] -right_bit 0 -name lbll_key] .bits]]
+	set key_dict [dict create]
 	set i 0
 	foreach lat_type $lat_types {
 		set lat [lindex $lat_type 0]
@@ -464,9 +495,14 @@ proc connect_latch_clk_rst {lib lat_types} {
 			set inv [create_inst [dict get $lib inv_type] -name "lbll_inv_$i" $design]
 		}
 
-		# create key ports
-		set key0 [lindex $key_bus $i]
-		set key1 [lindex $key_bus [expr $i+1]]
+		# select key ports
+		set k0i [expr int(rand()*[llength $key_bus])]
+		set key0 [lindex $key_bus $k0i]
+		set key_bus [lreplace $key_bus $k0i $k0i]
+
+		set k1i [expr int(rand()*[llength $key_bus])]
+		set key1 [lindex $key_bus $k1i]
+		set key_bus [lreplace $key_bus $k1i $k1i]
 
 		# connect latch
 		connect [get_db $xor .pins -if .base_name==[dict get $lib xor_i0]] [get_db clocks .sources]
@@ -487,28 +523,39 @@ proc connect_latch_clk_rst {lib lat_types} {
 		if {$type eq "L0"} {
 			set_case_analysis 1 $key0
 			set_case_analysis 0 $key1
-			dict set key [get_db $key0 .base_name] 1
-			dict set key [get_db $key1 .base_name] 0
+			dict set key_dict [get_db $key0 .base_name] 1
+			dict set key_dict [get_db $key1 .base_name] 0
 		} elseif {$type eq "L1"} {
 			set_case_analysis 1 $key0
 			set_case_analysis 1 $key1
-			dict set key [get_db $key0 .base_name] 1
-			dict set key [get_db $key1 .base_name] 1
+			dict set key_dict [get_db $key0 .base_name] 1
+			dict set key_dict [get_db $key1 .base_name] 1
 		} elseif {$type eq "logic"} {
 			set_case_analysis 0 $key0
 			set_case_analysis 0 $key1
-			dict set key [get_db $key0 .base_name] 0
-			dict set key [get_db $key1 .base_name] 0
+			dict set key_dict [get_db $key0 .base_name] 0
+			dict set key_dict [get_db $key1 .base_name] 0
 		} else {
 			set_case_analysis 0 $key0
 			set_case_analysis 1 $key1
-			dict set key [get_db $key0 .base_name] 0
-			dict set key [get_db $key1 .base_name] 1
+			dict set key_dict [get_db $key0 .base_name] 0
+			dict set key_dict [get_db $key1 .base_name] 1
 		}
 		incr i 2
 	}
 
-	return $key
+	set key ""
+	for {set ki 0} {$ki<$nbits} {incr ki} {
+		set key "[dict get $key_dict lbll_key\[$ki\]]$key"
+	}
+	set key "$nbits'b$key"
+
+	set sdc ""
+	dict for {k v} $key_dict {
+		append sdc "set_case_analysis $v $k\n"
+	}
+
+	return [list $key $sdc]
 }
 
 ##################### lbll #####################
@@ -527,6 +574,7 @@ proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5
 	expr srand($seed)
 
 	# select flops
+	if {[con_check 1 $lib]} {suspend}
 	set selected_ffs [select_ffs $nffs]
 
 	# convert flops to latches and retime
@@ -549,20 +597,21 @@ proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5
 
 	# insert delay decoys
 	echo "inserting $ndelay delay decoys..."
+	if {[con_check 1 $lib]} {suspend}
 	set delay_decoys [insert_delay_decoys $lib $ndelay]
 
 	# connect latch clock/reset
 	echo "adding key logic..."
-	set key [connect_latch_clk_rst $lib [concat $orig_lats $logic_decoys $delay_decoys]]
-	con_check
+	set result [connect_latch_clk_rst $lib [concat $orig_lats $logic_decoys $delay_decoys]]
+	if {[con_check]} {suspend}
 	if {$nlogic>0} {
 		syn_map
 	}
 
 	# check connections
-	con_check
+	if {[con_check]} {suspend}
 	
-	return $key
+	return $result
 }
 
 
