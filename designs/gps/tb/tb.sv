@@ -3,6 +3,9 @@ module tb;
 
 	logic sys_clk_50, sync_rst_in, startRound;
 	logic [5:0] sv_num;
+	logic [191:0] aes_key;
+	logic [30:0] pcode_speeds;
+	logic [47:0] pcode_initializers;
 
 	logic [12:0] ca_code;
 	logic [127:0] p_code, l_code;
@@ -15,11 +18,11 @@ module tb;
 	logic [`NBITS-1:0] lbll_key;
 	logic reset;
 
-	gps gold (sys_clk_50, sync_rst_in, sv_num, startRound, ca_code,
-		 p_code, l_code, l_code_valid);
+	gps gold (sys_clk_50, sync_rst_in, sv_num, startRound, aes_key, pcode_speeds, 
+			   ca_code, p_code, l_code, l_code_valid);
 
-	gps_lbll dut (sys_clk_50, sync_rst_in, sv_num, startRound, dut_ca_code,
-		 dut_p_code, dut_l_code, dut_l_code_valid, lbll_key);
+	gps_lbll dut (sys_clk_50, sync_rst_in, sv_num, startRound, aes_key, pcode_speeds,
+				   dut_ca_code, dut_p_code, dut_l_code, dut_l_code_valid, lbll_key);
 
 	integer f;
 	string key;
@@ -34,6 +37,9 @@ module tb;
 		sys_clk_50 = 0;
 		sync_rst_in = 0;
 		sv_num = 0;
+		aes_key = 0;
+		pcode_speeds = 0;
+		pcode_initializers = 0;
 		startRound = 0;
 
 		#1100

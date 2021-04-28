@@ -69,6 +69,7 @@ proc select_ffs {nffs} {
 	# This corresponds to a cone with high potential for retiming
 	# as the gates all share the same input ffs.
 	set largest_cone_size 0
+	set selected_ffs {}
 	foreach inst [get_db insts] {
 		# pass if inputs in fanin
 		set start_points [get_db [all_fanin -to [get_db $inst .pins -if .direction==in] -startpoints_only]]
@@ -81,6 +82,7 @@ proc select_ffs {nffs} {
 		# pass if fanin flops are not supported
 		if {[llength [get_db $start_ffs -if .lib_cell.is_rise_edge_triggered==false]] > 0} {continue}
 		# TODO: add other conditions here!
+		#if {[llength [get_db $start_ffs -if .base_name==*x2b*]] > 0} {continue}
 
 		# record cone size
 		set cone_size [llength [get_db [all_fanin -to [get_db $inst .pins -if .direction==in] -only_cells]]]
@@ -93,6 +95,8 @@ proc select_ffs {nffs} {
 }
 
 proc latch_convert_retime {lib clk selected_ffs} {
+
+	if {[llength $selected_ffs]==0} return {}
 
 	# TODO: make this safe
 	set design [get_db designs .base_name]
@@ -409,6 +413,7 @@ proc insert_logic_decoys {lib nlogic max_fio} {
 }
 
 proc insert_delay_decoys {lib ndelay} {
+	if {$ndelay==0} return {}
 	#### insert delay decoys
 	set design [get_db designs .base_name]
 	set lats [get_db insts -if .is_latch]
@@ -474,6 +479,7 @@ proc insert_delay_decoys {lib ndelay} {
 }
 
 proc connect_latch_clk_rst {lib lat_types} {
+	if {[llength $lat_types]==0} return {}
 	set design [get_db designs .base_name]
 	set nbits [expr [llength $lat_types]*2]
 	set key_bus [lreverse [get_db [create_port_bus -input -left_bit [expr $nbits-1] -right_bit 0 -name lbll_key] .bits]]
@@ -569,6 +575,7 @@ proc lbll {{lib $lbll_example_lib} {clk "clk"} {nbits 256} {nffs 10} {plogic 0.5
 	# plogic: % of decoys that are logic. Thus pdelay = 1-pdecoys.
 	# max_fio: maximum fanout/in for the added decoy logic
 	# seed: seed for random insertion
+	if {$nbits==0} return {}
 	
 	# set seed
 	expr srand($seed)

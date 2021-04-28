@@ -21,7 +21,7 @@ if {[lsearch -exact [get_design_info -list input] $RST]>-1} {
 	# map latches
 	foreach l [check_sec -list -signal -signal_type latch -imp -name .*L0.* -regexp] {
 		set f [string map [list "${CIRCUIT}_lbll_imp." "" "_L0" ""] $l]
-		check_sec -map -spec [list $f] -imp [list $l] -helper -imp_condition $CLK -speculative off
+		check_sec -map -spec [list $f] -imp [list $l] -helper -imp_condition "$CLK & !$RST" -speculative off
 	}
 
 	# map flops
@@ -59,13 +59,10 @@ if {[lsearch -exact [get_design_info -list input] $RST]>-1} {
 # set key
 set f [open locked/$CIRCUIT.key r]
 set key [gets $f]
-assume ${CIRCUIT}_lbll_imp.lbll_key==$key
-assume ${CIRCUIT}_lbll_imp.lbll_key==$key -reset
-#dict for {k v} $key {
-#	lappend key_eq "(${CIRCUIT}_lbll_imp.$k==1'b$v)"
-#}
-#assume [join $key_eq "&&"]
-#assume [join $key_eq "&&"] -reset
+if {[llength $key]>0} {
+	assume ${CIRCUIT}_lbll_imp.lbll_key==$key
+	assume ${CIRCUIT}_lbll_imp.lbll_key==$key -reset
+}
 
 # run sec
 check_sec -set_context -signal_type output -spec_delay 0 -imp_delay 0 -spec_condition_delay 0 -imp_condition_delay 0 -clock [list posedge $CLK] -global

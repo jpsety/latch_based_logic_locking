@@ -17,8 +17,7 @@ locked/%.v : src/syn.tcl src/lbll.tcl syn/%.v
 # logic equivalence between locked and syn
 locked/%.lec : syn/%.v locked/%.v src/lec.tcl
 	jg -sec src/lec.tcl -acquire_proj -define CIRCUIT $* \
-		-proj locked/$*_lec
-	#-no_gui
+		-proj locked/$*_lec -no_gui
 
 # sequential equivalence between locked and syn
 locked/%.sec : syn/%.v locked/%.v src/sec.tcl

@@ -1,64 +1,64 @@
+# logical equivalence script for lbll
+# Joe Sweeney, CMU
 
-set clk clk
-set_elaborate_single_run_mode off
-analyze -verilog syn/$CIRCUIT.v locked/$CIRCUIT.v designs/empty.v
-elaborate -top empty -bbox 1
-connect -bind $CIRCUIT orig -elaborate -auto
-connect -bind ${CIRCUIT}_lbll lock -elaborate -auto
+# load design
+source designs/$CIRCUIT/vars.tcl
+clear -all
+check_sec -setup \
+	-spec_top $CIRCUIT \
+	-spec_analyze_opts {-verilog syn/$CIRCUIT.v} \
+	-spec_elaborate_opts {-bbox 1} \
+	-imp_top ${CIRCUIT}_lbll \
+	-imp_analyze_opts {-verilog locked/$CIRCUIT.v} \
+	-imp_elaborate_opts {-bbox 1}
 
+#clock $CLK -factor 1 -phase 1 -both_edges
 clock -none
 reset -none
 
-set tie_eq {}
-set comp_eq {}
-
 # tie/comp flops
-foreach flop [get_design_info -instance lock -list flop] {
-	stopat $flop
-	stopat [string map {"lock" "orig"} ${flop}]
-	lappend tie_eq "(${flop} == [string map {"lock" "orig"} ${flop}])"
-	lappend comp_eq "([string map {"qi" "D"} ${flop}] == [string map {"qi" "D" "lock" "orig"} ${flop}])"
+foreach l [check_sec -list -signal -signal_type flop -imp] {
+	set f [string map [list "${CIRCUIT}_lbll_imp." ""] $l]
+	stopat [list $l]
+	stopat [list $f]
+	assume "([list $f] == [list $l])"
+	assert "([string map {"qi" "D"} [list $f]] == [string map {"qi" "D"} [list $l]])"
 }
 
 # tie/comp L0
-foreach latch [get_design_info -instance lock -list latch] {
-	if {[string first "_L0" $latch] == -1} {continue}
-	set flop [string map {"_L0" "" "lock" "orig"} $latch]
-	stopat $flop
-	stopat $latch
-	lappend tie_eq "($flop == $latch)"
-	lappend comp_eq "([string map {"qi" "D"} ${flop}] == [string map {"qi" "D"} ${latch}])"
+foreach l [check_sec -list -signal -signal_type latch -imp -name .*L0.* -regexp] {
+	set f [string map [list "${CIRCUIT}_lbll_imp." "" "_L0" ""] $l]
+	stopat [list $l]
+	stopat [list $f]
+	assume "([list $f] == [list $l])"
+	assert "([string map {"qi" "D"} [list $f]] == [string map {"qi" "D"} [list $l]])"
 }
 
 # tie inputs
-foreach input [get_design_info -instance orig -list input] {
-	lappend tie_eq "(lock.$input == orig.$input)"
+foreach l [concat [get_design_info -list input] [get_design_info -list bbox_out]] {
+	set f "${CIRCUIT}_lbll_imp.$l"
+	assume "([list $f] == [list $l])"
 }
 
 # compare outputs
-foreach output [get_design_info -instance orig -list output] {
-	lappend comp_eq "(lock.$output == orig.$output)"
+foreach l [concat [get_design_info -list output] [get_design_info -list bbox_in]] {
+	set f "${CIRCUIT}_lbll_imp.$l"
+	assert "([list $f] == [list $l])"
 }
 
-# assume keys
+assume $CLK==1'b1
+
+# set key
 set f [open locked/$CIRCUIT.key r]
 set key [gets $f]
-dict for {k v} $key {
-	lappend tie_eq "(lock.$k==1'b$v)"
+if {[llength $key]>0} {
+	assume ${CIRCUIT}_lbll_imp.lbll_key==$key
 }
 
-assume [join $tie_eq "&&"]
-assume lock.$clk==1'b1
-assume orig.$clk==1'b1
-assert [join $comp_eq "&&"]
-
-# prove
+check_sec -generate_verification
+set result [prove -all]
 set fp [open locked/$CIRCUIT.lec w]
-if {[prove -all] ne "proven"} {
-	puts $fp "error"
-} else {
-	puts $fp "equiv"
-}
+puts $fp $result
+close $fp
 exit
-
 
