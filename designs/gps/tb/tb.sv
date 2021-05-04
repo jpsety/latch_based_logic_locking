@@ -18,10 +18,10 @@ module tb;
 	logic [`NBITS-1:0] lbll_key;
 	logic reset;
 
-	gps gold (sys_clk_50, sync_rst_in, sv_num, startRound, aes_key, pcode_speeds, 
+	gps gold (sys_clk_50, sync_rst_in, sv_num, startRound, aes_key, pcode_speeds, pcode_initializers,
 			   ca_code, p_code, l_code, l_code_valid);
 
-	gps_lbll dut (sys_clk_50, sync_rst_in, sv_num, startRound, aes_key, pcode_speeds,
+	gps_lbll dut (sys_clk_50, sync_rst_in, sv_num, startRound, aes_key, pcode_speeds,pcode_initializers,
 				   dut_ca_code, dut_p_code, dut_l_code, dut_l_code_valid, lbll_key);
 
 	integer f;

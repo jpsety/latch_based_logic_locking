@@ -9,8 +9,8 @@
 //************************************************************************
 module pcode(
            clk, reset, prn_changed, en, sat,
-           preg, xn_cnt_speed, z_cnt_speed
-           //ini_x1a, ini_x1b, ini_x2a, ini_x2b
+           preg, xn_cnt_speed, z_cnt_speed,
+           ini_x1a, ini_x1b, ini_x2a, ini_x2b
        );
 parameter SAT_WIDTH = 6;
 parameter SREG_WIDTH = 37;
@@ -26,10 +26,10 @@ output wire preg; //Combinational output
 //Verification-focused inputs
 input [11:0] xn_cnt_speed; //default must be 1.
 input [18:0] z_cnt_speed; //default must be 1.
-localparam logic [11:0] ini_x1a = 12'b001001001000;
-localparam logic [11:0] ini_x1b = 12'b010101010100;
-localparam logic [11:0] ini_x2a = 12'b100100100101;
-localparam logic [11:0] ini_x2b = 12'b010101010100;
+input [11:0] ini_x1a;// = 12'b001001001000;
+input [11:0] ini_x1b;// = 12'b010101010100;
+input [11:0] ini_x2a;// = 12'b100100100101;
+input [11:0] ini_x2b;// = 12'b010101010100;
 
 
 wire rst = reset | prn_changed;

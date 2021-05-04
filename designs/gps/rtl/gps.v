@@ -15,7 +15,7 @@ module gps(
            startRound,
            aes_key,
            pcode_speeds,
-           //pcode_initializers,
+           pcode_initializers,
            ca_code,
            p_code,
            l_code,
@@ -27,7 +27,7 @@ input [5:0] sv_num;
 input startRound;
 input [191:0] aes_key;
 input [30:0] pcode_speeds;
-//input [47:0] pcode_initializers;
+input [47:0] pcode_initializers;
 output reg [12:0] ca_code;
 output [127:0] p_code;
 output [127:0] l_code;
@@ -126,16 +126,16 @@ wire p_code_bit;
 //verification connections:
 wire [11:0] pcode_xn_cnt_speed; //default must be 1.
 wire [18:0] pcode_z_cnt_speed; //default must be 1.
-//wire [11:0] pcode_ini_x1a;     //default must be 12'b001001001000;
-//wire [11:0] pcode_ini_x1b;     //default must be 12'b010101010100;
-//wire [11:0] pcode_ini_x2a;     //default must be 12'b100100100101;
-//wire [11:0] pcode_ini_x2b;     //default must be 12'b010101010100;
+wire [11:0] pcode_ini_x1a;     //default must be 12'b001001001000;
+wire [11:0] pcode_ini_x1b;     //default must be 12'b010101010100;
+wire [11:0] pcode_ini_x2a;     //default must be 12'b100100100101;
+wire [11:0] pcode_ini_x2b;     //default must be 12'b010101010100;
 assign pcode_xn_cnt_speed = pcode_speeds[11:0];
 assign pcode_z_cnt_speed  = pcode_speeds[30:12];
-//assign pcode_ini_x1a = pcode_initializers[11:0];
-//assign pcode_ini_x1b = pcode_initializers[23:12];
-//assign pcode_ini_x2a = pcode_initializers[35:24];
-//assign pcode_ini_x2b = pcode_initializers[47:36];
+assign pcode_ini_x1a = pcode_initializers[11:0];
+assign pcode_ini_x1b = pcode_initializers[23:12];
+assign pcode_ini_x2a = pcode_initializers[35:24];
+assign pcode_ini_x2b = pcode_initializers[47:36];
 pcode p(
         .clk            (gps_clk_fast  ),
         .reset          (sync_rst_in   ),
@@ -144,11 +144,11 @@ pcode p(
         .sat            (sv_num        ),
         .preg           (p_code_bit    ),
         .xn_cnt_speed   (pcode_xn_cnt_speed),
-        .z_cnt_speed    (pcode_z_cnt_speed)
-        //.ini_x1a        (pcode_ini_x1a ),
-        //.ini_x1b        (pcode_ini_x1b ),
-        //.ini_x2a        (pcode_ini_x2a ),
-        //.ini_x2b        (pcode_ini_x2b )
+        .z_cnt_speed    (pcode_z_cnt_speed),
+        .ini_x1a        (pcode_ini_x1a ),
+        .ini_x1b        (pcode_ini_x1b ),
+        .ini_x2a        (pcode_ini_x2a ),
+        .ini_x2b        (pcode_ini_x2b )
       );
 
 // Save 128 p-code bits, encrypt and send as l_code
