@@ -23,8 +23,8 @@ module gps_lbll_tss import llki_pkg::*; (
     input wire [47 : 0]   pcode_initializers,
     input wire            startRound,
     output wire [12 : 0]  ca_code,
-    input wire [127 : 0]  p_code,
-    input wire [127 : 0]  l_code,
+    output wire [127 : 0]  p_code,
+    output wire [127 : 0]  l_code,
     output wire           l_code_valid,
 
     // LLKI Discrete I/O
@@ -38,7 +38,7 @@ module gps_lbll_tss import llki_pkg::*; (
 );
 
   // Internal signals & localparams
-  localparam KEY_WORDS          = GPS_MOCK_TSS_NUM_KEY_WORDS;
+  localparam KEY_WORDS          = 4;
   reg [(64*KEY_WORDS) - 1:0]    llkid_key_register;
 
   //------------------------------------------------------------------
